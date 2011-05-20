@@ -7,7 +7,7 @@
  * Copyright © 2011 by <George Courtsunis> MIT License
  *
  */
-var jsEditable = (function() {
+var jsEditable = (function(doc, win) {
 
   var blockElemList = 'h1 h2 h3 h4 h5 h6 p pre blockquote address ul ol dir menu li dl div center form hr br'.split(' '),
       breakingElements = {};
@@ -86,7 +86,7 @@ var jsEditable = (function() {
   /**
    * Grab all text nodes relative to their parents
   */
-  p.getTextNodes = function(nodeList, resolveMentions) {
+  p.getTextNodes = function(nodeList) {
 
       // special case a single node by massaging into a list of nodes
       if (nodeList && nodeList.nodeType)
@@ -103,16 +103,12 @@ var jsEditable = (function() {
 
           switch (node.nodeType) {
               case 1:
-                  if (resolveMentions && isMention(node)) {
-                  textNodes = textNodes.concat(mentionToTextNode(node));
+                  textNodes = textNodes.concat(getTextNodes(node.childNodes));
                   break;
-              }
-              textNodes = textNodes.concat(getTextNodes(node.childNodes, resolveMentions));
-              break;
               case 3:
                   // HACK don't count garbage FF nodes
                   if (!/^\n\s+/.test(node.nodeValue))
-              textNodes.push(node);
+                      textNodes.push(node);
               break;
           }
       }
@@ -134,11 +130,8 @@ var jsEditable = (function() {
               name = node.nodeName.toLowerCase();
               // html node
               if (node.nodeType == 1) {
-                  // resolve mention nodes to text strings
-                  if (isMention(node))
-                      text += mentionToText(node);
                   // the last node, we don't want trailing newlines
-                  else if (i == nodes.length - 1)
+                  if (i == nodes.length - 1)
                       text += getTextHelper(node.childNodes, true);
                   // a breaking node, we don't want to add breaks to any of the children
                   else if (!ignoreBreaks && breakingElements.hasOwnProperty(name))
@@ -189,9 +182,6 @@ var jsEditable = (function() {
                   text += nodes[j].nodeValue;
               // html node
               else if (nodes[j].nodeType == 1 && !breakingElements.hasOwnProperty(nodes[j].nodeName.toLowerCase()))
-                  if (isMention(nodes[j]))
-                      text += mentionToText(nodes[j]);
-              else
                   text += getTextHelper(nodes[j].childNodes);
               else {
                   additionalNodes = true;
@@ -381,4 +371,4 @@ var jsEditable = (function() {
       }
   };
   return p;
-})();
+})(document, window);
