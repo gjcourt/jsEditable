@@ -1,4 +1,14 @@
-jseditable = (function() {
+/**
+ * jsEditable a xbrowser library for Ranges and contendEditable
+ *
+ * Author: George Courtsunis <gjcourt@gmail.com>
+ * Last Modified: 2011-05-19
+ * Version: 0.1
+ * Copyright © 2011 by <George Courtsunis> MIT License
+ *
+ */
+var jsEditable = (function() {
+
   var blockElemList = 'h1 h2 h3 h4 h5 h6 p pre blockquote address ul ol dir menu li dl div center form hr br'.split(' '),
       breakingElements = {};
 
