@@ -26,11 +26,12 @@ function decodeUTF8(utftext) {
         return utftext;
 
     // map over all encoded chars, and swap them out
-    DISQUS.each(terms, function(term, i) {
+    for (var i = 0, term; i < terms.length; ++i) {
+        term = terms[i];
         code = term.match(new RegExp(utf8Re));
         if (code.length)
             utftext = utftext.replace(code[0], String.fromCharCode(code[1]));
-    });
+    };
 
     return utftext;
 }
