@@ -18,13 +18,19 @@
         if (!elem || !elem.contentEditable)
             throw 'First argument must be contentEditable';
 
+        // create a local scope
+        var self = this;
+
+        // cache the contentEditable element
+        self.elem = elem;
+
         // locals
-        var blockElemList = 'h1 h2 h3 h4 h5 h6 p pre blockquote address ul ol dir menu li dl div center form hr br'.split(' '),
-            breakingElements = {};
+        var blockElemList = 'h1 h2 h3 h4 h5 h6 p pre blockquote address ul ol dir menu li dl div center form hr br'.split(' ');
+        self.breakingElements = {};
 
         // build a list of block level elements
         for (var i = 0; i < blockElemList.length; i++)
-            breakingElements[brElemList[i]] = true;
+            self.breakingElements[blockElemList[i]] = true;
 
         // private funcs
         /**
@@ -66,7 +72,18 @@
             return utftext;
         }
 
-        this.prototype = {
+        self.browser = {
+            ie:     /msie/i.test(navigator.userAgent) && !/opera/i.test(navigator.userAgent),
+            ie6:    !!(!window.XMLHttpRequest),
+            ie7:    !!(document.all && !window.opera && window.XMLHttpRequest),
+            webkit: ~navigator.userAgent.indexOf('AppleWebKit/'),
+            opera:  !!(window.opera && window.opera.buildNumber),
+            gecko:  ~navigator.userAgent.indexOf('Gecko/'),
+            mobile: /(iPhone|Android|iPod|iPad|webOS|Mobile Safari|Windows Phone)/i.test(navigator.userAgent),
+            quirks: document.compatMode === 'BackCompat'
+        };
+
+        var pub = {
 
             /**
              * Wrapper function for running contentEditable commands
@@ -97,16 +114,20 @@
             /**
              * Grab all text nodes relative to their parents
              */
+            // TODO make this function private and have the public version
+            // only return textNodes for the wrapped textArea
             getTextNodes: function(nodeList) {
 
                 // special case a single node by massaging into a list of nodes
                 if (nodeList && nodeList.nodeType)
                     nodeList = [nodeList];
+                // if nothing is passed in, get text nodes for self.elem
+                else if (!nodeList)
+                    nodeList = self.elem.childNodes;
 
                 var textNodes = [];
 
                 for (var i = 0, node; i < nodeList.length; ++i) {
-
                     node = nodeList[i];
 
                     if (!node)
@@ -114,13 +135,13 @@
 
                     switch (node.nodeType) {
                         case 1:
-                            textNodes = textNodes.concat(getTextNodes(node.childNodes));
-                        break;
+                            textNodes = textNodes.concat(this.getTextNodes(node.childNodes));
+                            break;
                         case 3:
                             // HACK don't count garbage FF nodes
                             if (!/^\n\s+/.test(node.nodeValue))
-                        textNodes.push(node);
-                        break;
+                            textNodes.push(node);
+                            break;
                     }
                 }
                 return textNodes;
@@ -129,7 +150,7 @@
             /**
              * Get unformatted comment text
              */
-            getText: function(textArea, callback) {
+            text: function(callback) {
 
                 /**
                  * Helper function to recursively aggregate all text from a set
@@ -146,7 +167,7 @@
                             if (i == nodes.length - 1)
                                 text += getTextHelper(node.childNodes, true);
                             // a breaking node, we don't want to add breaks to any of the children
-                            else if (!ignoreBreaks && breakingElements.hasOwnProperty(name))
+                            else if (!ignoreBreaks && self.breakingElements.hasOwnProperty(name))
                                 text += getTextHelper(node.childNodes, true) + '\n';
                             // text node, concatenate text
                             else
@@ -155,7 +176,7 @@
                         // text node
                         else if (node.nodeType == 3) {
                             // ignore garbage newline TextNodes
-                            if (DISQUS.host.browser.gecko && i === 0 && /^\n$/.test(node.nodeValue))
+                            if (self.browser.gecko && i === 0 && /^\n$/.test(node.nodeValue))
                                 continue;
                             text += node.nodeValue;
                         }
@@ -167,17 +188,15 @@
                     return text;
                 }
 
-                var nodes,
-                text = '',
-                index = 0;
+                var nodes, text = '', index = 0;
 
                 // massage the NodeList into an Array of HTMLElements
                 try {
-                    nodes = Array.prototype.slice.call(textArea.childNodes);
+                    nodes = Array.prototype.slice.call(self.elem.childNodes);
                 } catch (e) {
                     nodes = [];
-                    for (var i = 0; i < textArea.childNodes.length; ++i)
-                    nodes.push(textArea.childNodes[i]);
+                    for (var i = 0; i < self.elem.childNodes.length; ++i)
+                    nodes.push(self.elem.childNodes[i]);
                 }
 
                 // KLUDGE: WebKit doesn't have a breaking (<br>) element
@@ -185,7 +204,7 @@
                 // special case the first line. If there a multiple nodes, grab
                 // all text nodes until you hit the first block level element,
                 // and glue a newline to the end of the text string.
-                if (DISQUS.host.browser.webkit && nodes.length && nodes[0].nodeType == 3) {
+                if (self.browser.webkit && nodes.length && nodes[0].nodeType == 3) {
                     var additionalNodes = false;
                     for (var j = 0; j < nodes.length; ++j) {
                         index = j;
@@ -193,7 +212,7 @@
                         if (nodes[j].nodeType == 3)
                             text += nodes[j].nodeValue;
                         // html node
-                        else if (nodes[j].nodeType == 1 && !breakingElements.hasOwnProperty(nodes[j].nodeName.toLowerCase()))
+                        else if (nodes[j].nodeType == 1 && !self.breakingElements.hasOwnProperty(nodes[j].nodeName.toLowerCase()))
                             text += getTextHelper(nodes[j].childNodes);
                         else {
                             additionalNodes = true;
@@ -216,7 +235,7 @@
              * Get currently selected text node in
              * the contentEditable element.
              */
-            getSelectedTextNode: function() {
+            selectedTextNode: function() {
                 var sel,
                 range;
 
@@ -232,7 +251,7 @@
                     // If Internet Explorer 9 every becomes the lowest rung on the Microsoft browser family,
                     // simple delete this conditional and never look back. If you have the misfortune of
                     // modifying the following snippet, I wish you the best of luck in your endeavor.
-                    range = doc.selection.createRange().duplicate();
+                    range = doc.selection.createRange().duplicate()
 
                     // Microsoft thinks about the entire contentEditable container like a single
                     // line of text. Because of this, you won't be able to get the anchorNode of
@@ -251,10 +270,10 @@
                     // is done so that when the two strings differ, we can simply
                     // compare the remaining piece of the copied string with the
                     // current node, this saves us an extra couple of loops.
-                    for (i = 0; i < textArea.get(0).childNodes.length; ++i) {
+                    for (i = 0; i < self.elem.childNodes.length; ++i) {
 
-                        node = textArea.get(0).childNodes[i];
-                        textNodes = getTextNodes(node);
+                        node = self.elem.childNodes[i];
+                        textNodes = this.getTextNodes(node);
 
                         for (j = 0; j < textNodes.length; ++j) {
                             textNode = textNodes[j];
@@ -279,7 +298,7 @@
             /**
              * Get relative offset in the currently active text node
              */
-            getSelectedTextNodeOffset: function(node) {
+            selectedTextNodeOffset: function(node) {
                 var range, newOffset;
 
                 // Webkit/Firefox
@@ -352,9 +371,9 @@
                     // start position. The rest of the function can continue as
                     // normal afterwards.
                     if (range.parentElement().nodeName.toLowerCase() == 'body') {
-                        textArea.get(0).focus();
+                        self.elem.focus();
                         range = doc.selection.createRange();
-                        // expand over the entire textArea
+                        // expand over the entire extArea
                         while (range.moveStart('character', -1000) == -1000)
                             continue;
                         while (range.moveEnd('character', 1000) == 1000)
@@ -383,6 +402,8 @@
                 }
             }
         };
+
+        return pub;
     }
     // assign to the current window
     win.jsEditable = jsEditable;
